@@ -1,0 +1,101 @@
+$border-color: #EEE;
+$description-text-color: #999;
+$text-color: #333;
+$title-bar-height: 37px;
+$default-gutter: 7px;
+
+body {
+  display: flex;
+  font-family: "Source Sans Pro", sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.title-bar {
+  align-items: center;
+  background: #FFF;
+  border-bottom: 1px solid $border-color;
+  display: flex;
+  height: $title-bar-height;
+  justify-content: center;
+  position: fixed;
+  width: 100%;
+
+  h1 {
+    font-size: 15px;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+.container {
+  margin-top: $title-bar-height;
+}
+
+.github-issues {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: center;
+
+  &-row {
+    align-items: center;
+    border-top: 1px solid $border-color;
+    display: flex;
+    padding: 20px 30px 25px;
+
+    &:hover {
+      background: rgba(238, 238, 238, .2);
+    }
+
+    &-item {
+      flex: 1;
+
+      a {
+        color: #333;
+        display: block;
+        font-size: 18px;
+        font-weight: 600;
+        text-decoration: none;
+
+        &:hover {
+          text-decoration: underline;
+        }
+      }
+
+      &-description {
+        align-items: center;
+        color: $description-text-color;
+        display: flex;
+        font-size: 15px;
+        margin: 5px 0;
+
+        &-icon {
+          background: url("./images/github-icon.png");
+          background-size: cover;
+          display: inline-block;
+          height: 20px;
+          margin-right: $default-gutter;
+          width: 20px;
+        }
+      }
+    }
+
+    &-archive {
+      button {
+        background: url("./images/checkmark-regular.png");
+        background-size: cover;
+        border: 0;
+        height: 30px;
+        outline: none;
+        width: 30px;
+
+        &:hover {
+          background: url("./images/checkmark-success.png");
+          background-size: cover;
+          cursor: pointer;
+        }
+      }
+    }
+  }
+}
