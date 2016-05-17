@@ -1,0 +1,10 @@
+dependencies:
+  override:
+    - npm install -g elm@0.17 webpack
+    - elm package install -y
+    - npm install
+
+test:
+  override:
+    - webpack --bail
+
