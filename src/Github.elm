@@ -1,46 +1,25 @@
-module Github exposing (getIssuesForRepository, decodeIssues, Issue, PullRequest, Label, User)
+module Github exposing (getNotifications, markNotificationAsRead, decodeNotifications, Notification, User)
 
 import Http
-import Json.Decode exposing (Decoder, list, maybe, int, string)
+import Json.Decode exposing (Decoder, list, maybe, int, string, bool)
 import Json.Decode.Pipeline exposing (decode, required, optional, hardcoded)
 import Task
 
 -- Functions
-getIssuesForRepository : String -> String -> String
-getIssuesForRepository accessToken repository =
-  "http://api.github.com/repos/" ++ repository ++ "/issues?access_token=" ++ accessToken
+getNotifications : String -> String
+getNotifications accessToken =
+  "http://api.github.com/notifications?access_token=" ++ accessToken
+
+-- https://developer.github.com/v3/activity/notifications/#mark-a-thread-as-read
+markNotificationAsRead : String -> Notification -> String
+markNotificationAsRead accessToken notification =
+  let
+    threadId = notification.id
+  in
+    "http://api.github.com/notifications/threads/" ++ threadId ++ "?access_token=" ++ accessToken
+
 
 -- Parsers
-decodeIssues : String -> Decoder (List Issue)
-decodeIssues repositoryName =
-  list <| decodeIssue repositoryName
-
-decodeIssue : String ->Decoder Issue
-decodeIssue repositoryName =
-  decode Issue
-    |> required "id" int
-    |> required "url" string
-    |> required "repository_url" string
-    |> required "html_url" string
-    |> required "state" string
-    |> required "title" string
-    |> required "user" decodeUser
-    |> required "body" string
-    |> optional "pull_request" (maybe decodePullRequest) Nothing
-    |> required "labels" (list decodeLabel)
-    |> required "comments" int
-    |> required "created_at" string
-    |> required "updated_at" string
-    |> hardcoded repositoryName
-
-decodePullRequest : Decoder PullRequest
-decodePullRequest =
-  decode PullRequest
-    |> required "url" string
-    |> required "html_url" string
-    |> required "diff_url" string
-    |> required "patch_url" string
-
 decodeUser : Decoder User
 decodeUser =
   decode User
@@ -49,12 +28,41 @@ decodeUser =
     |> required "avatar_url" string
     |> required "url" string
 
-decodeLabel : Decoder Label
-decodeLabel =
-  decode Label
+decodeNotifications : Decoder (List Notification)
+decodeNotifications =
+  list <| decodeNotification
+
+decodeNotification : Decoder Notification
+decodeNotification =
+  decode Notification
+    |> required "id" string
+    |> required "repository" decodeRepository
+    |> required "subject" decodeSubject
+    |> required "reason" string
+    |> required "unread" bool
+    |> required "updated_at" string
+    |> required "last_read_at" (maybe string)
     |> required "url" string
+
+decodeRepository : Decoder Repository
+decodeRepository =
+  decode Repository
+    |> required "id" int
+    |> required "owner" decodeUser
     |> required "name" string
-    |> required "color" string
+    |> required "full_name" string
+    |> required "description" string
+    |> required "private" bool
+    |> required "fork" bool
+    |> required "url" string
+    |> required "html_url" string
+
+decodeSubject : Decoder Subject
+decodeSubject =
+  decode Subject
+    |> required "title" string
+    |> required "url" string
+    |> required "latest_comment_url" (maybe string)
 
 -- Types
 type alias User =
@@ -64,32 +72,32 @@ type alias User =
   , url : String
   }
 
-type alias Label =
-  { url : String
+type alias Repository =
+  { id : Int
+  , owner : User
   , name : String
-  , color : String
+  , full_name : String
+  , description : String
+  , private : Bool
+  , fork : Bool
+  , url : String
+  , html_url : String
   }
 
-type alias Issue =
-  { id : Int
+type alias Subject =
+  { title : String
   , url : String
-  , repository_url : String
-  , html_url : String
-  , state : String
-  , title : String
-  , user : User
-  , body : String
-  , pull_request : Maybe PullRequest
-  , labels : List Label
-  , comments : Int
-  , created_at : String
-  , updated_at : String
-  , repositoryName : String
-}
+  , latest_comment_url : Maybe String
+  -- , type : String
+  }
 
-type alias PullRequest =
-  { url : String
-  , html_url : String
-  , diff_url : String
-  , patch_url : String
+type alias Notification =
+  { id : String
+  , repository : Repository
+  , subject : Subject
+  , reason : String
+  , unread : Bool
+  , updated_at : String
+  , last_read_at : Maybe String
+  , url : String
   }

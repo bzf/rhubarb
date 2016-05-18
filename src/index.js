@@ -4,17 +4,10 @@ var remote = require("electron").remote;
 var ipcRenderer = require("electron").ipcRenderer;
 
 var configuration = JSON.parse(remote.getGlobal("configuration"));
-var archivedIssues = JSON.parse(remote.getGlobal("archived"));
-
-var flags = {
-  configuration: configuration,
-  archivedIssues: archivedIssues
-};
 
 var Elm = require("./Main.elm");
-var app = Elm.Main.fullscreen(flags);
+var app = Elm.Main.fullscreen(configuration);
 
-app.ports.updateArchivedIssues.subscribe(function(obj) {
-  ipcRenderer.send("writeArchivedIssues", obj[0]);
-  ipcRenderer.send("updateBadgeCount", obj[1]);
+app.ports.updateBadgeCount.subscribe(function(badgeCount) {
+  ipcRenderer.send("updateBadgeCount", badgeCount);
 });
