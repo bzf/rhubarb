@@ -11,7 +11,8 @@ var configurationPath = os.homedir() + "/.config/rhubarb/rhubarb.json";
 global.configuration = fs.readFileSync(configurationPath, "utf8");
 
 ipcMain.on("updateBadgeCount", function(_, badgeCounter) {
-  app.dock.setBadge(badgeCounter.toString());
+  var value = (badgeCounter > 0) ? badgeCounter.toString() : "";
+  app.dock.setBadge(value);
 });
 
 app.on("window-all-closed", function() {
