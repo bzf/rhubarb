@@ -17,7 +17,7 @@ import Json.Decode as Json
 import Github
 
 -- Ports
-port updateArchivedIssues : (List Int, Int) -> Cmd msg
+port updateBadgeCount : (Int) -> Cmd msg
 
 type alias AccessTokens =
   { github : String
@@ -43,23 +43,16 @@ main =
 
 type alias Model =
   { configuration : Configuration
-  , githubIssues : Dict Int Github.Issue
-  , archivedGithubIssues : List Int
+  , notifications : List Github.Notification
   , httpError : Maybe Http.Error
   }
 
-type alias Flags =
-  { configuration : Configuration
-  , archivedIssues : List Int
-  }
-
-init : Flags -> (Model, Cmd Msg)
-init { configuration, archivedIssues } =
+init : Configuration -> (Model, Cmd Msg)
+init configuration =
     ({ configuration = configuration
-     , githubIssues = Dict.empty
-     , archivedGithubIssues = archivedIssues
+     , notifications = []
      , httpError = Nothing
-    }, loadEverything configuration
+    }, (loadGithubNotifications configuration.accessTokens.github)
    )
 
 view : Model -> Html Msg
@@ -67,11 +60,7 @@ view model =
   div []
     [ renderTitleBar
     , div [ class "container" ]
-          [ model.githubIssues
-              |> Dict.values
-              |> List.filter (\x -> not <| List.member x.id model.archivedGithubIssues)
-              |> renderGithubIssues
-           ]
+          [ renderGithubNotifications model.notifications ]
     ]
 
 renderTitleBar : Html Msg
@@ -79,89 +68,75 @@ renderTitleBar =
   div [ class "title-bar" ]
       [ h1 [] [ text "Rhubarb" ] ]
 
-renderGithubIssues : List Github.Issue -> Html Msg
-renderGithubIssues issues =
-  div [ class "github-issues" ]
-      <| List.reverse <| List.map renderGithubIssue <| List.sortBy getDateFromIssue issues
+renderGithubNotifications : List Github.Notification -> Html Msg
+renderGithubNotifications notifications =
+  div [ class "github-notifications" ]
+      [ div [] <| List.map renderGithubNotification notifications
+      ]
 
-getDateFromIssue : Github.Issue -> Float
-getDateFromIssue issue =
-  case Date.fromString issue.updated_at of
-    Ok(date) -> Date.toTime date |> Time.inSeconds
-    Err(_) -> 0
-
-renderGithubIssue : Github.Issue -> Html Msg
-renderGithubIssue issue =
-  div [ class "github-issues-row" ]
-      [ div [ class "github-issues-row-item" ]
-            [ a [ attribute "href" issue.html_url, attribute "target" "_blank" ] [ text issue.title ]
-            , div [ class "github-issues-row-item-description" ]
-                  [ div [ class "github-issues-row-item-description-icon" ] []
-                  , div []
-                        [ i [] [ text issue.repositoryName ]
-                        , text (" by " ++ issue.user.login)
-                        ]
+renderGithubNotification : Github.Notification -> Html Msg
+renderGithubNotification notification =
+  div [ class "github-notifications-row" ]
+      [ div [ class "github-notifications-row-item" ]
+            [ a [ attribute "href" notification.repository.html_url, attribute "target" "_blank" ]
+                [ text notification.subject.title ]
+            , div [ class "github-notifications-row-item-description" ]
+                  [ div [ class "github-notifications-row-item-description-icon" ] []
+                  , i [] [ text notification.repository.full_name ]
                   ]
             ]
-      , div [ class "github-issues-row-archive" ]
+      , div [ class "github-notifications-row-archive" ]
             [ a [ attribute "href" "#" ]
-                [ button [ onClick <| ArchiveGithubIssue issue.id ] [] ]
+                [ button [ onClick (MarkNotification notification) ] [] ]
             ]
-       ]
+      ]
 
-type Msg = Noop
-         | LoadGithubIssues
-         | LoadedGithubIssues (List Github.Issue)
+type Msg = Noop Int
+         | LoadedGithubNotifications (List Github.Notification)
+         | MarkNotification Github.Notification
+         | SuccessfullyReadNotification Http.Response
          | LoadFailed Http.Error
+         | LoadError Http.RawError
          | Update
-         | ArchiveGithubIssue Int
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update message model =
   case message of
-    Noop -> (model, Cmd.none)
-    LoadedGithubIssues issues ->
+    Noop _ -> (model, Cmd.none)
+    LoadedGithubNotifications notifications ->
+      ({ model | notifications = notifications },
+       (updateBadgeCount <| List.length notifications))
+    MarkNotification notification ->
       let
-        newIssues = Dict.fromList <| List.map (\x -> (x.id, x)) issues
-        nextIssues = Dict.union model.githubIssues newIssues
+        accessToken = model.configuration.accessTokens.github
       in
-        ({ model | githubIssues = nextIssues }, Cmd.none)
+        (model, markGithubNotificationAsRead accessToken notification)
+    SuccessfullyReadNotification _ ->
+      (model, (loadGithubNotifications model.configuration.accessTokens.github))
     LoadFailed error -> ({ model | httpError = Just error }, Cmd.none)
-    Update -> (model, (loadEverything model.configuration))
-    ArchiveGithubIssue issueId ->
-      let
-        archivedGithubIssues = model.archivedGithubIssues
-        alreadyArchived = List.member issueId model.archivedGithubIssues
-        appendIssue = if alreadyArchived then [] else [issueId]
-        nextArchivedIssues = List.append archivedGithubIssues appendIssue
-        issuesLeft = numberOfIssuesLeft model
-      in
-        ({ model | archivedGithubIssues = nextArchivedIssues },
-         updateArchivedIssues (nextArchivedIssues, issuesLeft))
-    _ -> (model, Cmd.none)
-
-numberOfIssuesLeft : Model -> Int
-numberOfIssuesLeft model =
-  let
-    numberOfIssues = Dict.size model.githubIssues
-    numberOfArchivedIssues = List.length model.archivedGithubIssues
-  in
-    numberOfIssues - numberOfArchivedIssues - 1
+    LoadError _ -> (model, Cmd.none)
+    Update -> (model, (loadGithubNotifications model.configuration.accessTokens.github))
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
   Time.every minute (always Update)
 
-loadEverything : Configuration -> Cmd Msg
-loadEverything configuration =
+loadGithubNotifications : String -> Cmd Msg
+loadGithubNotifications accessToken =
   let
-    accessToken = configuration.accessTokens.github
+    url = Github.getNotifications accessToken
   in
-    Cmd.batch <| List.map (loadGithubIssues accessToken) configuration.projects
+    Task.perform LoadFailed LoadedGithubNotifications (Http.get Github.decodeNotifications url)
 
-loadGithubIssues : String -> Project -> Cmd Msg
-loadGithubIssues accessToken project =
+markGithubNotificationAsRead : String -> Github.Notification -> Cmd Msg
+markGithubNotificationAsRead accessToken notification =
   let
-    url = Github.getIssuesForRepository accessToken project.githubRepository
+    url = Github.markNotificationAsRead accessToken notification
+    request = { verb = "PATCH"
+              , url = url
+              , body = Http.empty
+              , headers = []
+              }
   in
-    Task.perform LoadFailed LoadedGithubIssues (Http.get (Github.decodeIssues project.name) url)
+    Http.send Http.defaultSettings request
+      |> Task.perform LoadError SuccessfullyReadNotification

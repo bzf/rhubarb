@@ -9,6 +9,10 @@ body {
   font-family: "Source Sans Pro", sans-serif;
   margin: 0;
   padding: 0;
+
+  & > div {
+    flex: 1;
+  }
 }
 
 .title-bar {
@@ -29,19 +33,23 @@ body {
 }
 
 .container {
+  flex: 1;
   margin-top: $title-bar-height;
 }
 
-.github-issues {
+.github-notifications {
   display: flex;
-  flex-direction: column;
-  flex: 1;
   justify-content: center;
+
+  & > div {
+    flex: 1;
+  }
 
   &-row {
     align-items: center;
     border-top: 1px solid $border-color;
     display: flex;
+    flex: 1;
     padding: 20px 30px 25px;
 
     &:hover {
@@ -86,6 +94,7 @@ body {
         background: url("./images/checkmark-regular.png");
         background-size: cover;
         border: 0;
+        width: auto;
         height: 30px;
         outline: none;
         width: 30px;
