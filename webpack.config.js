@@ -17,29 +17,28 @@ module.exports = {
   },
 
   module: {
-    loaders: [{
-      test: /\.elm$/,
-      exclude: [/elm-stuff/, /node_modules/],
-      loader: 'elm-webpack'
-    },
-    {
-      test: /\.(png|jpg|gif)$/,
-      loader: "file-loader"
-    },
-    {
-      test: /\.scss$/,
-      loaders: ["style", "css", "sass"]
-    }]
+    loaders: [
+      {
+        test: /\.elm$/,
+        exclude: [/elm-stuff/, /node_modules/],
+        loaders: ['elm-hot', 'elm-webpack']
+      },
+      {
+        test: /\.(png|jpg|gif)$/,
+        loaders: ["file-loader"]
+      },
+      {
+        test: /\.scss$/,
+        loaders: ["style", "css", "sass"]
+      },
+    ],
   },
 
-  plugins: [
-    new webpack.HotModuleReplacementPlugin(),
-    new webpack.IgnorePlugin(new RegExp("^(fs|ipc)$"))
-  ],
+  plugins: [ ],
 
   node: {
     "fs": "remote"
   },
 
-  target: "atom"
+  target: "atom",
 };
